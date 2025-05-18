@@ -152,3 +152,14 @@ client.once('ready', () => {
 });
 
 client.login(TOKEN);
+// Render用のダミーHTTPサーバー（ポート監視対策）
+const http = require('http');
+const PORT = process.env.PORT || 3000;
+
+http.createServer((req, res) => {
+  res.writeHead(200, { 'Content-Type': 'text/plain' });
+  res.end('Bot is running\n');
+}).listen(PORT, () => {
+  console.log(`🌀 Renderポートスキャン対策用ダミーサーバーが起動中: http://localhost:${PORT}`);
+});
+
