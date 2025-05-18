@@ -10,7 +10,7 @@ const client = new Client({
 });
 
 const TOKEN = process.env.DISCORD_TOKEN;
-const CLIENT_ID = 'あなたのクライアントID';
+const CLIENT_ID = '1367044432800518185';
 
 // コマンド定義
 const setupCommand = new SlashCommandBuilder()
