@@ -1,5 +1,45 @@
 const { Client, GatewayIntentBits, Partials, SlashCommandBuilder, REST, Routes, PermissionFlagsBits } = require('discord.js');
 const fs = require('fs');
+const LOG_CH = '1373520267023876096';
+const SETTINGS_FILE = './settings.json';
+
+// 設定読み込み
+let settings = {};
+if (fs.existsSync(SETTINGS_FILE)) {
+  try {
+    settings = JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8'));
+  } catch {
+    console.warn('⚠️ 設定ファイルの読み込みに失敗しました');
+  }
+}
+
+// 設定保存
+function saveSettings() {
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify(settings, null, 2));
+}
+
+// Discordログ送信
+function logToDiscord(msg) {
+  const ch = client.channels.cache.get(LOG_CH);
+  if (ch?.isTextBased()) ch.send('```fix\n' + msg.slice(0, 1900) + '\n```');
+}
+
+// エラーハンドリング
+process.on('unhandledRejection', err => {
+  console.error(err);
+  logToDiscord('UnhandledRejection:\n' + (err.stack || err));
+});
+process.on('uncaughtException', err => {
+  console.error(err);
+  logToDiscord('UncaughtException:\n' + (err.stack || err));
+});
+
+// 定期再起動（Renderなどの健康チェック対応）
+setInterval(() => {
+  logToDiscord('💤 Daily restart for health check');
+  process.exit(0);
+}, 24 * 60 * 60 * 1000);
+
 require('dotenv').config();
 
 let config = JSON.parse(fs.readFileSync('./config.json', 'utf8'));
