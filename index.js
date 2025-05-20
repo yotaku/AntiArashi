@@ -1,5 +1,12 @@
 const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const config = require('./config.json');
+const http = require('http');
+const server = http.createServer((req, res) => {
+  res.writeHead(200);
+  res.end('Bot is running!');
+});
+server.listen(process.env.PORT || 3000);
+
 
 const client = new Client({
   intents: [
