@@ -2,12 +2,13 @@
   "bannedInvites": [
     "https://discord.gg/UqfUXTTXh9",
     "https://discord.gg/ctkp",
-    "https://is.gd/W4CPo7",
-    "https://bit.ly/4kmMSkZ",
-    "https://bit.ly/4jVu8t8",
-    "https://00m.in/UsLzi",
-    "https://tinyurl.com/2xkssp6b",
-    "https://ouo.io/ibze45k",
-    "https://x.gd/249862"
+  ]
+  "forceKickKeywords": [
+    "x.gd",
+    "bit.ly",
+    "tinyurl.com",
+    "ouo.io",
+    "is.gd",
+    "00m.in"
   ]
 }
