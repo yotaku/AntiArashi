@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, Partials } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, PermissionFlagsBits } = require('discord.js');
 const config = require('./config.json');
 const http = require('http');
 const fetch = require('node-fetch');
@@ -20,8 +20,8 @@ const client = new Client({
   partials: [Partials.Message, Partials.Channel]
 });
 
-client.on('ready', () => {
-  console.log(✅ Bot logged in as ${client.user.tag});
+client.once('ready', () => {
+  console.log(`✅ Bot logged in as ${client.user.tag}`);
 });
 
 // URLを展開（短縮リンク対応）
@@ -50,7 +50,7 @@ async function expandUrl(url) {
 
 // 不正URL検出＆Kick処理
 async function checkAndKick(message) {
-  if (!message || !message.content || message.author?.bot) return;
+  if (!message || !message.content || message.author?.bot || !message.guild) return;
 
   const content = message.content.toLowerCase();
   const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -59,12 +59,10 @@ async function checkAndKick(message) {
   for (const url of urls) {
     const rawUrl = url.toLowerCase();
 
-    // ✅ 強制キーワードに一致するか（展開せず）
     const forceMatched = config.forceKickKeywords?.some(keyword =>
       rawUrl.includes(keyword.toLowerCase())
     );
 
-    // ✅ URLを展開して招待リンクなどと照合
     const expandedUrl = await expandUrl(url);
     const inviteMatched = config.bannedInvites?.some(invite =>
       expandedUrl.toLowerCase().includes(invite.toLowerCase())
@@ -72,44 +70,40 @@ async function checkAndKick(message) {
 
     if (forceMatched || inviteMatched) {
       try {
-        await message.delete();
-        console.log(🗑️ Deleted message from ${message.author.tag}: ${url});
+        if (message.deletable) await message.delete();
+        console.log(`🗑️ Deleted message from ${message.author.tag}: ${url}`);
 
-        // ✅ DM送信（共通）
         try {
           await message.author.send("あなたが送信したメッセージは荒らし対策により削除されました。");
-        } catch (dmErr) {
-          console.warn(⚠️ DM送信失敗: ${message.author.tag});
+        } catch {
+          console.warn(`⚠️ DM送信失敗: ${message.author.tag}`);
         }
 
         if (inviteMatched) {
-          // ✅ 招待リンクなどに一致 → キックする
-          await message.guild.members.kick(message.author.id, Posted banned invite URL);
-          console.log(❌ Kicked ${message.author.tag} for posting: ${url});
-        } else if (forceMatched) {
-          // ✅ forceキーワードに一致 → キックしない
-          console.log(🚨 Force keyword matched for ${message.author.tag}, kick skipped.);
+          try {
+            await message.guild.members.kick(message.author.id, 'Posted banned invite URL');
+            console.log(`❌ Kicked ${message.author.tag} for posting: ${url}`);
+          } catch (kickErr) {
+            console.warn(`⚠️ キック失敗: ${message.author.tag}`, kickErr);
+          }
+        } else {
+          console.log(`🚨 Force keyword matched for ${message.author.tag}, kick skipped.`);
         }
 
       } catch (err) {
-        console.error(⚠️ 処理失敗: ${message.author.tag}, err);
+        console.error(`⚠️ 処理失敗: ${message.author.tag}`, err);
       }
 
-      return; // 1件検出で処理終了
+      return;
     }
   }
 }
 
-client.on('messageCreate', checkAndKick);
-client.on('messageUpdate', (_, newMsg) => checkAndKick(newMsg));
-
-const { PermissionFlagsBits } = require('discord.js');
-
 // スパム対策設定
 const spamConfig = {
   maxMessages: 5,
-  interval: 10 * 1000,         // 10秒間
-  timeoutDuration: 30 * 1000   // 30秒間タイムアウト
+  interval: 10 * 1000,
+  timeoutDuration: 30 * 1000
 };
 
 const messageLogs = new Map();
@@ -126,37 +120,32 @@ function cleanupOldLogs(userId) {
   return updatedLogs;
 }
 
-client.on('messageCreate', async (message) => {
+async function handleSpam(message) {
   if (message.author.bot || !message.guild) return;
 
   const userId = message.author.id;
   const guild = message.guild;
-
-  // ログ更新
   const logs = cleanupOldLogs(userId);
   logs.push(Date.now());
   messageLogs.set(userId, logs);
 
   if (logs.length >= spamConfig.maxMessages) {
     try {
-      // メッセージ削除処理
       const fetched = await message.channel.messages.fetch({ limit: 100 });
       const userMessages = fetched.filter(
         m => m.author.id === userId && Date.now() - m.createdTimestamp < spamConfig.interval
       );
 
       for (const msg of userMessages.values()) {
-        await msg.delete().catch(() => {});
+        if (msg.deletable) await msg.delete().catch(() => {});
       }
 
-      // DM通知
       try {
         await message.author.send('あなたの連続したメッセージはスパムと判断され、削除されました。30秒間メッセージを送信できなくなります。');
       } catch {
         console.warn(`⚠️ DM送信失敗: ${message.author.tag}`);
       }
 
-      // タイムアウト処理
       let member;
       try {
         member = await guild.members.fetch(userId);
@@ -174,7 +163,6 @@ client.on('messageCreate', async (message) => {
         console.warn(`⚠️ タイムアウトできません: ${message.author.tag}`);
       }
 
-      // ログ送信
       if (!config?.logChannelId) {
         console.warn('⚠️ logChannelId が設定されていません。');
       } else {
@@ -190,7 +178,17 @@ client.on('messageCreate', async (message) => {
       console.error(`⚠️ スパム対処エラー: ${message.author.tag}`, err);
     }
 
-    // ログリセット
     messageLogs.set(userId, []);
   }
+}
+
+// イベント登録
+client.on('messageCreate', async (message) => {
+  await checkAndKick(message);
+  await handleSpam(message);
 });
+
+client.on('messageUpdate', (_, newMsg) => checkAndKick(newMsg));
+
+// ログイン
+client.login(config.token);
