@@ -1,9 +1,9 @@
 const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const config = require('./config.json');
 const http = require('http');
-const fetch = require('node-fetch'); // npm install node-fetch
+const fetch = require('node-fetch'); // 必要: npm install node-fetch
 
-// Renderの監視用サーバー
+// Render用のHTTPサーバー（常時稼働維持）
 const server = http.createServer((req, res) => {
   res.writeHead(200);
   res.end('Bot is running!');
@@ -16,57 +16,65 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMembers
+    GatewayIntentBits.GuildMembers,
   ],
-  partials: [Partials.Message, Partials.Channel]
+  partials: [Partials.Message, Partials.Channel],
 });
 
 client.on('ready', () => {
   console.log(`✅ Bot logged in as ${client.user.tag}`);
 });
 
-// URL展開（短縮URLの展開処理）
+// 🔍 短縮URLを展開する関数（GETでリダイレクト追跡）
 async function expandUrl(url) {
   try {
-    const response = await fetch(url, { method: 'HEAD', redirect: 'follow' });
+    const response = await fetch(url, {
+      method: 'GET',
+      redirect: 'follow',
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (AntiArashiBot)', // 一部サービスで必須
+      },
+    });
     return response.url || url;
   } catch (err) {
-    return url; // 展開に失敗したら元のURLを返す
+    console.warn(`⚠️ URL展開失敗: ${url}`);
+    return url; // 展開失敗したらそのまま使用
   }
 }
 
-// メッセージをチェックして違反者をキック
+// 🔒 招待リンクチェック & Kick処理
 async function checkAndKick(message) {
   if (!message || !message.content || message.author?.bot) return;
 
-  const messageContent = message.content.toLowerCase();
+  const content = message.content.toLowerCase();
+
+  // 全URL抽出
   const urlRegex = /(https?:\/\/[^\s]+)/g;
-  const urls = messageContent.match(urlRegex) || [];
+  const urls = content.match(urlRegex) || [];
 
   for (const url of urls) {
-    const expanded = await expandUrl(url); // 短縮URLを展開
-    const allUrls = [url.toLowerCase(), expanded.toLowerCase()];
+    const expanded = await expandUrl(url);
 
-    const matchedInvite = config.bannedInvites.find(invite =>
-      allUrls.some(u => u.includes(invite.toLowerCase()))
+    const matched = config.bannedInvites.find(inv =>
+      expanded.toLowerCase().includes(inv.toLowerCase())
     );
 
-    if (matchedInvite) {
+    if (matched) {
       try {
         await message.delete();
-        await message.guild.members.kick(message.author.id, `Posted banned invite: ${matchedInvite}`);
+        await message.guild.members.kick(message.author.id, `Posted banned invite: ${matched}`);
         console.log(`❌ Kicked ${message.author.tag} for banned invite`);
-      } catch (error) {
-        console.error(`⚠️ Failed to kick ${message.author.tag}:`, error);
+      } catch (err) {
+        console.error(`⚠️ Kick失敗: ${message.author.tag}`, err);
       }
-      return; // 最初の1件だけ処理
+      return; // 一つ見つけたら終了
     }
   }
 }
 
-// 新規メッセージと編集済みメッセージの両方に対応
+// 新規メッセージと編集メッセージの両方に対応
 client.on('messageCreate', checkAndKick);
 client.on('messageUpdate', async (_, newMsg) => checkAndKick(newMsg));
 
-// Bot起動
+// Botログイン
 client.login(process.env.BOT_TOKEN);
