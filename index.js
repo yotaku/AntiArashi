@@ -75,8 +75,8 @@ function isUserMessage(message) {
   return (
     message &&
     message.author &&
-    !message.author.bot &&
-    message.webhookId === null // webhookからの投稿ではない
+    message.guild &&
+    message.author.id !== client.user.id // 自分自身のBotは除外するが、それ以外のBotやWebhookは含める
   );
 }
 
