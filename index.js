@@ -60,22 +60,6 @@ function getSenderTag(message) {
   return `@${message.member?.displayName || message.author.username}`; // ユーザー → @表示名
 }
 
-// URL展開
-async function expandUrl(url) {
-  try {
-    const response = await fetch(url, {
-      method: 'GET',
-      redirect: 'follow',
-      headers: { 'User-Agent': 'Mozilla/5.0 (AntiArashiBot)' }
-    });
-    const text = await response.text();
-    const metaMatch = text.match(/http-equiv=["']refresh["'] content=["']\d+;\s*url=(.*?)["']/i);
-    return metaMatch ? metaMatch[1] : response.url || url;
-  } catch {
-    return url;
-  }
-}
-
 // 不正リンク検出と処理
 function isUserMessage(message) {
   return (
