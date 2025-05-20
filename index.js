@@ -53,11 +53,11 @@ client.on('interactionCreate', async interaction => {
   const command = client.commands.get(interaction.commandName);
   if (command) await command.execute(interaction);
 });
-
+// 送信者特定
 function getSenderTag(message) {
   if (message.webhookId) return 'Webhook';
-  if (message.author.bot) return `@${message.author.username}`;
-  return message.author.tag;
+  if (message.author.bot) return `@${message.author.username}`; // Bot → @Bot名
+  return `@${message.member?.displayName || message.author.username}`; // ユーザー → @表示名
 }
 
 // URL展開
