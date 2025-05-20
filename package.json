@@ -1,13 +1,12 @@
 {
-  "name": "discord-kickbot",
+  "name": "anti-arashi-bot",
   "version": "1.0.0",
-  "description": "Kick users who post banned Discord invites",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "discord.js": "^14.0.0"
+    "discord.js": "^14.11.0",
     "node-fetch": "^2.6.7"
   }
 }
