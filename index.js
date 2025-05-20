@@ -59,12 +59,12 @@ async function checkAndKick(message) {
   for (const url of urls) {
     const rawUrl = url.toLowerCase();
 
-    // ✅ 展開せず強制Kick対象に含まれるか
+    // ✅ 強制キーワードに一致するか（展開せず）
     const forceMatched = config.forceKickKeywords?.some(keyword =>
       rawUrl.includes(keyword.toLowerCase())
     );
 
-    // ✅ 展開して招待リンク含まれるか
+    // ✅ URLを展開して招待リンクなどと照合
     const expandedUrl = await expandUrl(url);
     const inviteMatched = config.bannedInvites?.some(invite =>
       expandedUrl.toLowerCase().includes(invite.toLowerCase())
@@ -73,11 +73,28 @@ async function checkAndKick(message) {
     if (forceMatched || inviteMatched) {
       try {
         await message.delete();
-        await message.guild.members.kick(message.author.id, `Posted banned or forced keyword URL`);
-        console.log(`❌ Kicked ${message.author.tag} for posting: ${url}`);
+        console.log(`🗑️ Deleted message from ${message.author.tag}: ${url}`);
+
+        // ✅ DM送信（共通）
+        try {
+          await message.author.send("あなたが送信したメッセージは荒らし対策により削除されました。");
+        } catch (dmErr) {
+          console.warn(`⚠️ DM送信失敗: ${message.author.tag}`);
+        }
+
+        if (inviteMatched) {
+          // ✅ 招待リンクなどに一致 → キックする
+          await message.guild.members.kick(message.author.id, `Posted banned invite URL`);
+          console.log(`❌ Kicked ${message.author.tag} for posting: ${url}`);
+        } else if (forceMatched) {
+          // ✅ forceキーワードに一致 → キックしない
+          console.log(`🚨 Force keyword matched for ${message.author.tag}, kick skipped.`);
+        }
+
       } catch (err) {
-        console.error(`⚠️ Kick failed: ${message.author.tag}`, err);
+        console.error(`⚠️ 処理失敗: ${message.author.tag}`, err);
       }
+
       return; // 1件検出で処理終了
     }
   }
