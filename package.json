@@ -2,11 +2,9 @@
   "name": "anti-arashi-bot",
   "version": "1.0.0",
   "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
-  },
+  "type": "module",
   "dependencies": {
-    "discord.js": "^14.11.0",
+    "discord.js": "^14.14.1",
     "node-fetch": "^2.6.7"
   }
 }
