@@ -54,6 +54,12 @@ client.on('interactionCreate', async interaction => {
   if (command) await command.execute(interaction);
 });
 
+function getSenderTag(message) {
+  if (message.webhookId) return 'Webhook';
+  if (message.author.bot) return `@${message.author.username}`;
+  return message.author.tag;
+}
+
 // URL展開
 async function expandUrl(url) {
   try {
@@ -104,8 +110,9 @@ async function checkAndKick(message) {
         const logChannelId = db[message.guild.id];
         if (logChannelId) {
           const logChannel = message.guild.channels.cache.get(logChannelId);
+          const sender = getSenderTag(message);
           if (logChannel?.permissionsFor(message.guild.members.me).has(PermissionFlagsBits.SendMessages)) {
-            await logChannel.send(`🚨 ${message.author.tag} のメッセージを削除しました: ${url}`);
+            await logChannel.send(`🚨 ${sender} のメッセージを削除しました: ${url}`);
           }
         }
 
@@ -164,8 +171,9 @@ async function handleSpam(message) {
       const logChannelId = db[message.guild.id];
       if (logChannelId) {
         const logChannel = message.guild.channels.cache.get(logChannelId);
+        const sender = getSenderTag(message);
         if (logChannel?.permissionsFor(message.guild.members.me).has(PermissionFlagsBits.SendMessages)) {
-          await logChannel.send(`🛑 ${message.author.tag} がスパム検出により削除・タイムアウトされました。`);
+          await logChannel.send(`🛑 ${sender} がスパム検出により削除・タイムアウトされました。`);
         }
       }
 
