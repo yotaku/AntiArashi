@@ -8,12 +8,9 @@ module.exports = {
     .setName('setup')
     .setDescription('ログを送信するチャンネルを設定します。')
     .addChannelOption(option =>
-      option
-        .setName('channel')
-        .setDescription('ログを送信するチャンネル')
-        .setRequired(true)
+      option.setName('channel').setDescription('ログを送信するチャンネル').setRequired(true)
     )
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator), // 管理者のみ使用可
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction) {
     const guildId = interaction.guildId;
@@ -29,8 +26,8 @@ module.exports = {
     } catch {}
 
     db[guildId] = channel.id;
-
     fs.writeFileSync(dbPath, JSON.stringify(db, null, 2));
+
     await interaction.reply(`✅ ログ送信先を <#${channel.id}> に設定しました。`);
   }
 };
