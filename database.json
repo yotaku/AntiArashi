@@ -1,1 +1,12 @@
-{}
+// 起動時
+let db = {};
+try {
+  db = JSON.parse(fs.readFileSync('./database.json', 'utf8'));
+} catch {
+  db = {};
+}
+
+// 保存時
+function saveDatabase() {
+  fs.writeFileSync('./database.json', JSON.stringify(db, null, 2));
+}
