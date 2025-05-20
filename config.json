@@ -1,7 +1,9 @@
 {
   "bannedInvites": [
-    "https://discord.gg/UqfUXTTXh9",
-    "https://discord.gg/ctkp",
+    "discord.gg/ctkp",
+    "discord.gg/UqfUXTTXh9",
+    "discord.com/invite/ctkp",
+    "discord.com/invite/UqfUXTTXh9"
   ]
   "forceKickKeywords": [
     "x.gd",
