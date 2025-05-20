@@ -142,47 +142,35 @@ function cleanupOldLogs(userId) {
   return updatedLogs;
 }
 
-async function handleSpam(message) {
-  if (!isUserMessage(message) || !message.guild) return;
-  const userId = message.author.id;
-  const logs = cleanupOldLogs(userId);
-  logs.push(Date.now());
+async function handleSpam(message, userData, logChannel) {
+  const { author } = message;
+  const sender = getSenderTag(message);
 
-  if (logs.length >= spamConfig.maxMessages) {
-    try {
-      const fetched = await message.channel.messages.fetch({ limit: 100 });
-      const userMessages = fetched.filter(
-        m => m.author.id === userId && Date.now() - m.createdTimestamp < spamConfig.interval
-      );
-      for (const msg of userMessages.values()) {
-        if (msg.deletable) await msg.delete().catch(() => {});
-      }
+  if (!message.member) {
+    console.error(`❌ スパム処理エラー: ${author.tag} はメンバー情報が取得できません`);
+    return;
+  }
 
-      try {
-        await message.author.send('あなたの連続したメッセージはスパムと判断され、削除されました。30秒間メッセージを送信できなくなります。');
-      } catch {}
+  // DM通知
+  try {
+    await author.send("あなたのメッセージはスパム検出により削除されました。");
+  } catch (e) {
+    console.warn(`⚠️ ${author.tag} へのDMに失敗: ${e.message}`);
+  }
 
-      const member = await message.guild.members.fetch(userId);
-      if (member?.moderatable && typeof member.timeout === 'function') {
-        await member.timeout(spamConfig.timeoutDuration, 'スパム');
-      }
+  // タイムアウト
+  try {
+    await message.member.timeout(30_000, "スパム防止");
+  } catch (e) {
+    console.error(`❌ ${author.tag} のタイムアウト失敗: ${e.message}`);
+  }
 
-      const db = JSON.parse(fs.readFileSync('./database.json', 'utf8'));
-      const logChannelId = db[message.guild.id];
-      if (logChannelId) {
-        const logChannel = message.guild.channels.cache.get(logChannelId);
-        const sender = getSenderTag(message);
-        if (logChannel?.permissionsFor(message.guild.members.me).has(PermissionFlagsBits.SendMessages)) {
-          await logChannel.send(`🛑 ${sender} がスパム検出により削除・タイムアウトされました。`);
-        }
-      }
-
-    } catch (err) {
-      console.error('❌ スパム処理エラー:', err);
-    }
-    messageLogs.set(userId, []);
+  // ログ送信
+  if (logChannel?.permissionsFor(message.guild.members.me).has(PermissionFlagsBits.SendMessages)) {
+    await logChannel.send(`🛑 ${sender} がスパム検出により削除・タイムアウトされました。`);
   }
 }
+
 
 client.on('messageCreate', async (message) => {
   await checkAndKick(message);
