@@ -1,34 +1,32 @@
 const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const config = require('./config.json');
 const http = require('http');
-const fetch = require('node-fetch'); // npm install node-fetch
+const fetch = require('node-fetch');
 
-// Render用 HTTP keepalive
-const server = http.createServer((req, res) => {
+// HTTPサーバー（Render対策）
+http.createServer((_, res) => {
   res.writeHead(200);
   res.end('Bot is running!');
-});
-server.listen(process.env.PORT || 3000);
+}).listen(process.env.PORT || 3000);
 
-// Discordクライアント初期化
+// Discordクライアント設定
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildMembers
   ],
-  partials: [Partials.Message, Partials.Channel],
+  partials: [Partials.Message, Partials.Channel]
 });
 
 client.on('ready', () => {
   console.log(`✅ Bot logged in as ${client.user.tag}`);
 });
 
-// 🔍 URL展開（x.gd専用処理含む）
+// URLを展開（短縮リンク対応）
 async function expandUrl(url) {
   try {
-    // x.gd はGETでしか展開できない
     const response = await fetch(url, {
       method: 'GET',
       redirect: 'follow',
@@ -36,23 +34,21 @@ async function expandUrl(url) {
         'User-Agent': 'Mozilla/5.0 (AntiArashiBot)'
       }
     });
+
     const finalUrl = response.url || url;
 
-    // x.gdのように中間ページで止まる場合は、本文からmetaリダイレクトを取得（保険）
+    // metaリダイレクト対策
     const text = await response.text();
-    const match = text.match(/http-equiv=["']refresh["'] content=["']\d+;\s*url=(.*?)["']/i);
-    if (match) {
-      return match[1];
-    }
+    const metaMatch = text.match(/http-equiv=["']refresh["'] content=["']\d+;\s*url=(.*?)["']/i);
+    if (metaMatch) return metaMatch[1];
 
     return finalUrl;
-  } catch (err) {
-    console.warn(`⚠️ URL展開失敗: ${url}`);
+  } catch {
     return url;
   }
 }
 
-// 🔒 招待リンク検出処理
+// 不正URL検出＆Kick処理
 async function checkAndKick(message) {
   if (!message || !message.content || message.author?.bot) return;
 
@@ -61,29 +57,33 @@ async function checkAndKick(message) {
   const urls = content.match(urlRegex) || [];
 
   for (const url of urls) {
-    const expanded = await expandUrl(url);
+    const rawUrl = url.toLowerCase();
 
-    const matched = config.bannedInvites.find(invite =>
-      expanded.toLowerCase().includes(invite.toLowerCase()) ||
-      url.toLowerCase().includes("x.gd") // 明示的にx.gdが含まれているだけで処理
+    // ✅ 展開せず強制Kick対象に含まれるか
+    const forceMatched = config.forceKickKeywords?.some(keyword =>
+      rawUrl.includes(keyword.toLowerCase())
     );
 
-    if (matched) {
+    // ✅ 展開して招待リンク含まれるか
+    const expandedUrl = await expandUrl(url);
+    const inviteMatched = config.bannedInvites?.some(invite =>
+      expandedUrl.toLowerCase().includes(invite.toLowerCase())
+    );
+
+    if (forceMatched || inviteMatched) {
       try {
         await message.delete();
-        await message.guild.members.kick(message.author.id, `Posted banned invite: ${matched}`);
-        console.log(`❌ Kicked ${message.author.tag} for banned invite or x.gd usage`);
+        await message.guild.members.kick(message.author.id, `Posted banned or forced keyword URL`);
+        console.log(`❌ Kicked ${message.author.tag} for posting: ${url}`);
       } catch (err) {
-        console.error(`⚠️ Kick失敗: ${message.author.tag}`, err);
+        console.error(`⚠️ Kick failed: ${message.author.tag}`, err);
       }
-      return;
+      return; // 1件検出で処理終了
     }
   }
 }
 
-// メッセージ作成＆編集に対応
 client.on('messageCreate', checkAndKick);
-client.on('messageUpdate', async (_, newMsg) => checkAndKick(newMsg));
+client.on('messageUpdate', (_, newMsg) => checkAndKick(newMsg));
 
-// Discordログイン
 client.login(process.env.BOT_TOKEN);
