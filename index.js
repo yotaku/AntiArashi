@@ -71,8 +71,17 @@ async function expandUrl(url) {
 }
 
 // 不正リンク検出と処理
+function isUserMessage(message) {
+  return (
+    message &&
+    message.author &&
+    !message.author.bot &&
+    message.webhookId === null // webhookからの投稿ではない
+  );
+}
+
 async function checkAndKick(message) {
-  if (!message || !message.content || message.author?.bot || !message.guild) return;
+  if (!isUserMessage(message) || !message.content || !message.guild) return;
 
   const content = message.content.toLowerCase();
   const urls = content.match(/https?:\/\/[^\s]+/g) || [];
@@ -108,6 +117,7 @@ async function checkAndKick(message) {
   }
 }
 
+
 // スパム検出
 const spamConfig = {
   maxMessages: 5,
@@ -126,7 +136,7 @@ function cleanupOldLogs(userId) {
 }
 
 async function handleSpam(message) {
-  if (message.author.bot || !message.guild) return;
+  if (!isUserMessage(message) || !message.guild) return;
   const userId = message.author.id;
   const logs = cleanupOldLogs(userId);
   logs.push(Date.now());
