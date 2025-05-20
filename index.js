@@ -4,8 +4,8 @@ const path = require('path');
 const http = require('http');
 const fetch = require('node-fetch');
 const config = require('./config.json');
-
 const token = process.env.DISCORD_TOKEN;
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -22,29 +22,25 @@ http.createServer((_, res) => {
   res.end('Bot is running!');
 }).listen(process.env.PORT || 3000);
 
-// コマンド登録
+// コマンド読み込み
 client.commands = new Collection();
 const commandFiles = fs.readdirSync('./commands').filter(file => file.endsWith('.js'));
-const commands = [];
-
 for (const file of commandFiles) {
   const command = require(`./commands/${file}`);
-  client.commands.set(command.name, command);
-  commands.push({
-    name: command.name,
-    description: command.description
-  });
+  client.commands.set(command.data.name, command);
 }
 
 // スラッシュコマンド登録
 client.once('ready', async () => {
   console.log(`✅ Bot logged in as ${client.user.tag}`);
-
   const rest = new REST({ version: '10' }).setToken(token);
+
   try {
     const guilds = client.guilds.cache.map(g => g.id);
     for (const guildId of guilds) {
-      await rest.put(Routes.applicationGuildCommands(client.user.id, guildId), { body: commands });
+      await rest.put(Routes.applicationGuildCommands(client.user.id, guildId), {
+        body: client.commands.map(cmd => cmd.data.toJSON())
+      });
       console.log(`🔧 コマンド登録完了: ${guildId}`);
     }
   } catch (err) {
@@ -58,7 +54,7 @@ client.on('interactionCreate', async interaction => {
   if (command) await command.execute(interaction);
 });
 
-// 短縮URL展開
+// URL展開
 async function expandUrl(url) {
   try {
     const response = await fetch(url, {
@@ -66,19 +62,15 @@ async function expandUrl(url) {
       redirect: 'follow',
       headers: { 'User-Agent': 'Mozilla/5.0 (AntiArashiBot)' }
     });
-
-    const finalUrl = response.url || url;
     const text = await response.text();
     const metaMatch = text.match(/http-equiv=["']refresh["'] content=["']\d+;\s*url=(.*?)["']/i);
-    if (metaMatch) return metaMatch[1];
-
-    return finalUrl;
+    return metaMatch ? metaMatch[1] : response.url || url;
   } catch {
     return url;
   }
 }
 
-// 不正URL検出と処理
+// 不正リンク検出と処理
 async function checkAndKick(message) {
   if (!message || !message.content || message.author?.bot || !message.guild) return;
 
@@ -86,24 +78,17 @@ async function checkAndKick(message) {
   const urls = content.match(/https?:\/\/[^\s]+/g) || [];
 
   for (const url of urls) {
-    const rawUrl = url.toLowerCase();
     const expandedUrl = await expandUrl(url);
-
-    const forceMatched = config.forceKickKeywords.some(k => rawUrl.includes(k));
+    const forceMatched = config.forceKickKeywords.some(k => url.includes(k));
     const inviteMatched = config.bannedInvites.some(i => expandedUrl.includes(i));
 
     if (forceMatched || inviteMatched) {
       try {
         if (message.deletable) await message.delete();
-
-        try {
-          await message.author.send("あなたが送信したメッセージは荒らし対策により削除されました。");
-        } catch {}
+        try { await message.author.send('あなたが送信したメッセージは荒らし対策により削除されました。'); } catch {}
 
         if (inviteMatched) {
-          try {
-            await message.guild.members.kick(message.author.id, '招待リンク投稿');
-          } catch {}
+          try { await message.guild.members.kick(message.author.id, '招待リンク投稿'); } catch {}
         }
 
         const db = JSON.parse(fs.readFileSync('./database.json', 'utf8'));
@@ -118,7 +103,6 @@ async function checkAndKick(message) {
       } catch (err) {
         console.error('❌ 処理中エラー:', err);
       }
-
       return;
     }
   }
@@ -143,7 +127,6 @@ function cleanupOldLogs(userId) {
 
 async function handleSpam(message) {
   if (message.author.bot || !message.guild) return;
-
   const userId = message.author.id;
   const logs = cleanupOldLogs(userId);
   logs.push(Date.now());
@@ -154,7 +137,6 @@ async function handleSpam(message) {
       const userMessages = fetched.filter(
         m => m.author.id === userId && Date.now() - m.createdTimestamp < spamConfig.interval
       );
-
       for (const msg of userMessages.values()) {
         if (msg.deletable) await msg.delete().catch(() => {});
       }
@@ -180,7 +162,6 @@ async function handleSpam(message) {
     } catch (err) {
       console.error('❌ スパム処理エラー:', err);
     }
-
     messageLogs.set(userId, []);
   }
 }
