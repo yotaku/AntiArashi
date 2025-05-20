@@ -103,4 +103,56 @@ async function checkAndKick(message) {
 client.on('messageCreate', checkAndKick);
 client.on('messageUpdate', (_, newMsg) => checkAndKick(newMsg));
 
+// ==========================
+// 🔰 連続投稿スパム対策機能
+// ==========================
+
+// スパム対策設定（必要に応じてconfig.jsonに移せます）
+const spamConfig = {
+  maxMessages: 5,          // 許容される最大投稿数
+  interval: 10 * 1000,     // 監視時間（ミリ秒）10秒
+  kickOnSpam: true         // スパム検出でKickするか
+};
+
+// ユーザーの投稿履歴を記録
+const messageLogs = new Map();
+
+function cleanupOldLogs(userId) {
+  const now = Date.now();
+  const logs = messageLogs.get(userId) || [];
+  const updatedLogs = logs.filter(ts => now - ts < spamConfig.interval);
+  messageLogs.set(userId, updatedLogs);
+  return updatedLogs;
+}
+
+client.on('messageCreate', async (message) => {
+  if (message.author.bot) return;
+
+  const userId = message.author.id;
+
+  // ログ更新
+  const logs = cleanupOldLogs(userId);
+  logs.push(Date.now());
+  messageLogs.set(userId, logs);
+
+  if (logs.length >= spamConfig.maxMessages) {
+    // スパムと判定
+    try {
+      await message.delete();
+      await message.author.send('あなたの連続したメッセージはスパムと判断され、削除されました。');
+
+      if (spamConfig.kickOnSpam) {
+        await message.guild.members.kick(userId, 'Spamming messages');
+        console.log(`❌ ${message.author.tag} をスパム投稿でKickしました。`);
+      } else {
+        console.log(`🚨 ${message.author.tag} がスパム投稿しましたがKickは無効。`);
+      }
+    } catch (err) {
+      console.error(`⚠️ スパム対処エラー (${message.author.tag})`, err);
+    }
+
+    messageLogs.set(userId, []); // ログリセット
+  }
+});
+
 client.login(process.env.BOT_TOKEN);
