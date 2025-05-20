@@ -1,13 +1,16 @@
 const { Client, GatewayIntentBits, Partials } = require('discord.js');
 const config = require('./config.json');
 const http = require('http');
-const fetch = require('node-fetch'); // 要インストール: npm install node-fetch
+const fetch = require('node-fetch'); // npm install node-fetch
+
+// Renderの監視用サーバー
 const server = http.createServer((req, res) => {
   res.writeHead(200);
   res.end('Bot is running!');
 });
 server.listen(process.env.PORT || 3000);
 
+// Discordクライアントの初期化
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -22,17 +25,17 @@ client.on('ready', () => {
   console.log(`✅ Bot logged in as ${client.user.tag}`);
 });
 
-// 🔍 URLを正規化（短縮URLの場合、展開）
+// URL展開（短縮URLの展開処理）
 async function expandUrl(url) {
   try {
     const response = await fetch(url, { method: 'HEAD', redirect: 'follow' });
     return response.url || url;
-  } catch {
-    return url; // エラーがあれば元URLで処理
+  } catch (err) {
+    return url; // 展開に失敗したら元のURLを返す
   }
 }
 
-// 🔒 招待リンクチェック処理（新規メッセージ or 編集）
+// メッセージをチェックして違反者をキック
 async function checkAndKick(message) {
   if (!message || !message.content || message.author?.bot) return;
 
@@ -41,10 +44,11 @@ async function checkAndKick(message) {
   const urls = messageContent.match(urlRegex) || [];
 
   for (const url of urls) {
-    const expanded = await expandUrl(url);
+    const expanded = await expandUrl(url); // 短縮URLを展開
+    const allUrls = [url.toLowerCase(), expanded.toLowerCase()];
 
     const matchedInvite = config.bannedInvites.find(invite =>
-      expanded.toLowerCase().includes(invite.toLowerCase())
+      allUrls.some(u => u.includes(invite.toLowerCase()))
     );
 
     if (matchedInvite) {
@@ -55,12 +59,14 @@ async function checkAndKick(message) {
       } catch (error) {
         console.error(`⚠️ Failed to kick ${message.author.tag}:`, error);
       }
-      return; // 1つ検出で十分
+      return; // 最初の1件だけ処理
     }
   }
 }
 
+// 新規メッセージと編集済みメッセージの両方に対応
 client.on('messageCreate', checkAndKick);
-client.on('messageUpdate', async (oldMsg, newMsg) => checkAndKick(newMsg));
+client.on('messageUpdate', async (_, newMsg) => checkAndKick(newMsg));
 
+// Bot起動
 client.login(process.env.BOT_TOKEN);
