@@ -1,26 +1,36 @@
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 const dbPath = path.join(__dirname, '..', 'database.json');
 
 module.exports = {
-  name: 'setup',
-  description: 'ログを送信するチャンネルを設定します。',
+  data: new SlashCommandBuilder()
+    .setName('setup')
+    .setDescription('ログを送信するチャンネルを設定します。')
+    .addChannelOption(option =>
+      option
+        .setName('channel')
+        .setDescription('ログを送信するチャンネル')
+        .setRequired(true)
+    )
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator), // 管理者のみ使用可
+
   async execute(interaction) {
-    if (!interaction.memberPermissions.has('Administrator')) {
+    const guildId = interaction.guildId;
+    const channel = interaction.options.getChannel('channel');
+
+    if (!interaction.memberPermissions.has(PermissionFlagsBits.Administrator)) {
       return interaction.reply({ content: '❌ このコマンドは管理者のみ使用できます。', ephemeral: true });
     }
-
-    const guildId = interaction.guildId;
-    const channelId = interaction.channelId;
 
     let db = {};
     try {
       db = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
     } catch {}
 
-    db[guildId] = channelId;
+    db[guildId] = channel.id;
 
     fs.writeFileSync(dbPath, JSON.stringify(db, null, 2));
-    await interaction.reply(`✅ このチャンネルをログ送信先に設定しました。`);
+    await interaction.reply(`✅ ログ送信先を <#${channel.id}> に設定しました。`);
   }
 };
