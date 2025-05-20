@@ -4,13 +4,11 @@
     "discord.gg/UqfUXTTXh9",
     "discord.com/invite/ctkp",
     "discord.com/invite/UqfUXTTXh9"
-  ]
+  ],
   "forceKickKeywords": [
-    "x.gd",
-    "bit.ly",
-    "tinyurl.com",
-    "ouo.io",
-    "is.gd",
-    "00m.in"
+    "x.gd", "bit.ly", "tinyurl.com", "goo.gl", "is.gd", "ow.ly",
+    "t.co", "rebrand.ly", "cutt.ly", "short.io", "short.gy", "v.gd",
+    "s.id", "tiny.cc", "rb.gy", "lnkd.in", "linktr.ee", "shrtco.de",
+    "chilp.it", "clck.ru", "buff.ly", "bit.do", "adf.ly", "bc.vc", "shorturl.at"
   ]
 }
